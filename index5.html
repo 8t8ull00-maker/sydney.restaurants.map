@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sydney Restaurants Map</title>
+
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+
+<style>
+html, body { height: 100%; margin: 0; font-family: Arial, sans-serif; }
+#map { width: 100%; height: 100%; }
+
+/* Draggable Sidebar & Legend */
+#sidebar, #legend {
+  position: absolute;
+  background: white;
+  padding: 10px;
+  border-radius: 5px;
+  box-shadow:0 0 10px rgba(0,0,0,0.3);
+  z-index: 1000;
+  cursor: move;
+}
+#sidebar { top:10px; left:10px; width:250px; max-height:80%; overflow-y:auto; }
+#legend { bottom:10px; left:10px; width:180px; font-size:13px; }
+
+/* Collapsible toggles */
+.toggleBtn {
+  background:#4287f5; color:white; border:none; border-radius:3px; cursor:pointer; padding:3px 6px; font-size:12px;
+}
+
+/* Sidebar styles */
+#sidebar h2 { margin-top:0; font-size:16px; }
+.sidebar-item { cursor:pointer; margin: 5px 0; padding: 5px; border-radius:3px; }
+.sidebar-item:hover { background:#f0f0f0; }
+.filter-btns button { margin:2px; padding:3px 6px; cursor:pointer; }
+.filter-btns button.active { background:#4287f5; color:white; border:none; border-radius:3px; }
+
+/* Popups */
+.popup-content { font-size: 14px; }
+.popup-content span.emoji { font-size: 20px; display:inline-block; margin-right:5px; }
+
+/* Zoom button */
+#zoomHighRated {
+  position:absolute;
+  bottom:10px; right:10px;
+  padding:8px 10px;
+  background:#4287f5;
+  color:white;
+  border:none;
+  border-radius:5px;
+  cursor:pointer;
+  z-index:1000;
+}
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <h2>Restaurants</h2>
+  <button class="toggleBtn" id="toggleSidebar">Collapse</button>
+  <div class="filter-btns">
+    <button class="active" onclick="filterCuisine('All')">All</button>
+    <button onclick="filterCuisine('Italian')">Italian</button>
+    <button onclick="filterCuisine('Indian')">Indian</button>
+  </div>
+  <div id="restaurantList"></div>
+</div>
+
+<div id="legend">
+  <b>Glow Intensity = Rating</b><br>
+  4.5–5 ⭐ High<br>
+  4.2–4.49 ⭐ Medium-High<br>
+  4.0–4.19 ⭐ Medium<br>
+  < 4 ⭐ Low
+  <br><button class="toggleBtn" id="toggleLegend">Collapse</button>
+</div>
+
+<div id="map"></div>
+<button id="zoomHighRated">Zoom to High Rated (4.5+)</button>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+<script>
+// Initialize map
+const map = L.map('map').setView([-33.86, 151.21], 12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  attribution:'&copy; OpenStreetMap contributors'
+}).addTo(map);
+
+// Restaurant data (28) - REPLACE with full 28 restaurant details
+const restaurants = [
+  {name:"Ecco Ristorante",type:"Italian",lat:-33.866,lon:151.125,rating:4.5,desc:"Elegant waterfront Italian dining with seasonal a-la-carte dishes",hours:"11am-10pm",url:"https://www.ecco.com.au/"},
+  {name:"La Panchina",type:"Italian",lat:-33.880,lon:151.210,rating:4.3,desc:"Casual Roman-style pizzas and artisanal gelato",hours:"12pm-10pm",url:"https://www.opentable.com.au/r/la-panchina-surry-hills"},
+  {name:"Braci Osteria + Pizzeria",type:"Italian",lat:-33.800,lon:151.220,rating:4.6,desc:"Acclaimed pizza and creative pies",hours:"12pm-11pm",url:"https://www.opentable.com.au/cuisine/best-pizzeria-restaurants-sydney-olympic-park"},
+  {name:"City Oltra",type:"Italian",lat:-33.880,lon:151.205,rating:4.0,desc:"Informal semi-permanent pizza bar under Central Station",hours:"10am-10pm",url:"#"},
+  {name:"Divino Osteria",type:"Italian",lat:-33.870,lon:151.230,rating:4.2,desc:"Cozy southern-Italian osteria",hours:"12pm-10pm",url:"#"},
+  {name:"Fresh Cafe Neutral Bay",type:"Italian",lat:-33.840,lon:151.210,rating:4.1,desc:"Contemporary Italian dishes",hours:"10am-9pm",url:"#"},
+  {name:"Criniti’s",type:"Italian",lat:-33.810,lon:151.120,rating:4.0,desc:"Massive wood-fired pizzas, Southern Italian-Australian fusion",hours:"11am-11pm",url:"#"},
+  {name:"Pikkio Pizzeria Trattoria",type:"Italian",lat:-33.840,lon:151.130,rating:4.2,desc:"Hearty suburban Italian pizzas & pasta",hours:"11am-10pm",url:"#"},
+  {name:"La Bufala",type:"Italian",lat:-33.890,lon:151.170,rating:4.0,desc:"Reliable wood-fired pizza & pasta",hours:"11am-10pm",url:"#"},
+  {name:"Andiamo Trattoria Rhodes",type:"Italian",lat:-33.820,lon:151.070,rating:4.3,desc:"Classic Italian in Rhodes",hours:"12pm-10pm",url:"https://www.andiamotrattoria.com.au/feedback-rhodes/"},
+  {name:"Russo & Russo",type:"Italian",lat:-33.800,lon:151.080,rating:4.1,desc:"Italian dining with modern touches",hours:"12pm-10pm",url:"https://www.russoandrusso.net.au/"},
+  {name:"Piccolo Roma (Olympic Park)",type:"Italian",lat:-33.8468,lon:151.0711,rating:4.2,desc:"Authentic Italian near Olympic Park",hours:"12pm-10pm",url:"#"},
+  {name:"Oliveto Ristorante & Bar",type:"Italian",lat:-33.870,lon:151.210,rating:4.4,desc:"Italian fine dining in a relaxed setting",hours:"12pm-10pm",url:"#"},
+  
+  {name:"Pinky Ji",type:"Indian",lat:-33.870,lon:151.210,rating:4.3,desc:"Neon-lit modern Indian, bold creative dishes",hours:"12pm-10pm",url:"#"},
+  {name:"Dosa Hut",type:"Indian",lat:-33.870,lon:151.100,rating:4.5,desc:"South Indian specialty dosas & biryanis",hours:"11am-10pm",url:"http://www.abhisindian.com.au/"},
+  {name:"Chatkazz",type:"Indian",lat:-33.870,lon:151.095,rating:4.1,desc:"Vegetarian street-food with vada pav & jalebi",hours:"11am-10pm",url:"#"},
+  {name:"Don’t Tell Aunty",type:"Indian",lat:-33.870,lon:151.200,rating:4.0,desc:"Bollywood-style Indian fusion, quirky cocktails",hours:"12pm-11pm",url:"#"},
+  {name:"Manjit’s Wharf",type:"Indian",lat:-33.870,lon:151.080,rating:4.2,desc:"Tandoori & curry dishes with river views",hours:"11am-10pm",url:"#"},
+  {name:"The Spice Room",type:"Indian",lat:-33.870,lon:151.210,rating:4.5,desc:"Elevated Indian street-food, banquet-style spreads",hours:"12pm-11pm",url:"#"},
+  {name:"Delhi ’O’ Delhi",type:"Indian",lat:-33.880,lon:151.200,rating:4.3,desc:"Elegant Indian regional cuisine, vegan options",hours:"12pm-10pm",url:"#"},
+  {name:"Urban Tadka",type:"Indian",lat:-33.830,lon:151.220,rating:4.1,desc:"Resort-style Indian dining, award-winning dishes",hours:"12pm-10pm",url:"#"},
+  {name:"Faheem Fast Food",type:"Indian",lat:-33.880,lon:151.190,rating:4.0,desc:"Late-night Indian/Pakistani curries & tandoori",hours:"6pm-2am",url:"#"},
+  {name:"Indian Home Diner",type:"Indian",lat:-33.870,lon:151.200,rating:4.2,desc:"Garlic-cheese naan kebabs, street-style eats",hours:"11am-11pm",url:"#"},
+  {name:"Spiced by Billus",type:"Indian",lat:-33.860,lon:151.210,rating:4.3,desc:"Homestyle Indian buffet, under $40 in Barangaroo",hours:"12pm-10pm",url:"#"},
+  {name:"Abhis Indian Restaurant",type:"Indian",lat:-33.870,lon:151.100,rating:4.2,desc:"Classic Indian cuisine",hours:"11am-10pm",url:"http://www.abhisindian.com.au/"},
+  {name:"Maharajas Indian Cuisine Homebush",type:"Indian",lat:-33.850,lon:151.070,rating:4.1,desc:"Family-style Indian dishes",hours:"12pm-10pm",url:"https://maharajasindiancuisinehomebush.com.au/"},
+  {name:"New Shakthi Takeaway & Restaurant",type:"Indian",lat:-33.8677,lon:151.0838,rating:4.0,desc:"Indian casual dining & takeaway",hours:"10am-10pm",url:"#"},
+  {name:"Urbano Organic Coffee",type:"Indian",lat:-33.870,lon:151.210,rating:4.0,desc:"Indian fusion & cafe-style offerings",hours:"7am-8pm",url:"https://www.facebook.com/urbanoOrganicCoffee"}
+];
+
+// Helper for glow intensity
+function getGlowIntensity(rating){ return 5 + (rating-4.0)*15; }
+
+// Create marker
+function createMarker(r){
+  const color = r.type==='Italian'?'red':'blue';
+  const glow = getGlowIntensity(r.rating);
+  return L.divIcon({
+    className:'custom-div-icon',
+    html:`<div style="
+      background:${color};
+      border-radius:50%;
+      width:20px;
+      height:20px;
+      box-shadow:0 0 ${glow}px ${color};
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      color:white;
+      font-size:14px;
+      "><span class="emoji">${r.type==='Italian'?'🍕':'🍛'}</span></div>`,
+    iconSize:[30,30],
+    iconAnchor:[15,15]
+  });
+}
+
+// Add markers
+const markers=[];
+restaurants.forEach(r=>{
+  const marker = L.marker([r.lat,r.lon], {icon:createMarker(r)}).addTo(map);
+  marker.bindPopup(`
+    <div class="popup-content">
+      <b>${r.name}</b> <span class="emoji">${r.type==='Italian'?'🍕':'🍛'}</span><br>
+      ${r.desc}<br>
+      Hours: ${r.hours}<br>
+      Rating: ${r.rating} / 5<br>
+      <a href="${r.url}" target="_blank">Website/Menu</a>
+    </div>
+  `);
+  markers.push({marker,r});
+});
+
+// Sidebar rendering
+const restaurantList=document.getElementById('restaurantList');
+function renderList(filter='All'){
+  restaurantList.innerHTML='';
+  restaurants.forEach(r=>{
+    if(filter!=='All' && r.type!==filter) return;
+    const div=document.createElement('div');
+    div.className='sidebar-item';
+    div.innerHTML=`${r.name} <span class="emoji">${r.type==='Italian'?'🍕':'🍛'}</span>`;
+    div.onclick=()=>{ map.setView([r.lat,r.lon],15); markers.find(m=>m.r===r)?.marker.openPopup();}
+    restaurantList.appendChild(div);
+  });
+}
+renderList();
+
+// Filter buttons
+function filterCuisine(type){
+  document.querySelectorAll('.filter-btns button').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.filter-btns button').forEach(b=>{if(b.textContent===type) b.classList.add('active');});
+  renderList(type);
+}
+
+// Collapsible sidebar
+const sidebar=document.getElementById('sidebar');
+const toggleSidebarBtn = document.getElementById('toggleSidebar');
+toggleSidebarBtn.onclick = ()=>{
+  sidebar.classList.toggle('collapsed');
+  toggleSidebarBtn.textContent = sidebar.classList.contains('collapsed')?'Expand':'Collapse';
+};
+
+// Collapsible legend
+const legend=document.getElementById('legend');
+const toggleLegendBtn = document.getElementById('toggleLegend');
+toggleLegendBtn.onclick = ()=>{
+  legend.style.display = legend.style.display==='none'?'block':'none';
+};
+
+// Zoom high-rated
+document.getElementById('zoomHighRated').onclick = ()=>{
+  const highMarkers = markers.filter(m=>m.r.rating>=4.5).map(m=>m.marker.getLatLng());
+  if(highMarkers.length>0){
+    const group = L.featureGroup(highMarkers.map(latlng=>L.marker(latlng)));
+    map.fitBounds(group.getBounds().pad(0.3));
+  }
+};
+
+// Make sidebar & legend draggable
+function makeDraggable(el){
+  let pos1=0,pos2=0,pos3=0,pos4=0;
+  el.onmousedown=dragMouseDown;
+  el.ontouchstart=dragTouchStart;
+
+  function dragMouseDown(e){
+    e=e||window.event; e.preventDefault();
+    pos3=e.clientX; pos4=e.clientY;
+    document.onmouseup=closeDragElement;
+    document.onmousemove=elementDrag;
+  }
+  function dragTouchStart(e){
+    e=e||window.event;
+    pos3=e.touches[0].clientX; pos4=e.touches[0].clientY;
+    document.ontouchend=closeDragElement;
+    document.ontouchmove=elementTouchDrag;
+  }
+  function elementDrag(e){
+    e=e||window.event; e.preventDefault();
+    pos1=pos3-e.clientX; pos2=pos4-e.clientY;
+    pos3=e.clientX; pos4=e.clientY;
+    el.style.top=(el.offsetTop-pos2)+'px';
+    el.style.left=(el.offsetLeft-pos1)+'px';
+  }
+  function elementTouchDrag(e){
+    e=e||window.event;
+    pos1=pos3-e.touches[0].clientX; pos2=pos4-e.touches[0].clientY;
+    pos3=e.touches[0].clientX; pos4=e.touches[0].clientY;
+    el.style.top=(el.offsetTop-pos2)+'px';
+    el.style.left=(el.offsetLeft-pos1)+'px';
+  }
+  function closeDragElement(){ document.onmouseup=null; document.onmousemove=null; document.ontouchend=null; document.ontouchmove=null; }
+}
+
+makeDraggable(sidebar);
+makeDraggable(legend);
+
+// **Auto-collapse on small screens (mobile)** 
+if(window.innerWidth <= 768){
+  sidebar.classList.add('collapsed');
+  toggleSidebarBtn.textContent = 'Expand';
+  legend.style.display = 'none';
+}
+</script>
+</body>
+</html>
